@@ -29,6 +29,8 @@ import os
 import re 
 from threading import Thread
 
+from src.NetCloud import HttpPost
+
 
 class NetCloudCrawl(object):
     '''
@@ -224,7 +226,7 @@ class NetCloudCrawl(object):
                 print("Successfully to get page {page}.".format(page = i+1))
         return all_comments_list
 
-    def threading_save_all_comments_to_file(self,threads = 10):
+    def threading_save_all_comments_to_fileByLau(self,comments_url,beginPage,endPage,real,threads = 10):
         '''
         use multi threading to get all comments,note that will not
         ensure the crawled comments' order
@@ -234,7 +236,7 @@ class NetCloudCrawl(object):
         with open(self.comments_file_path,"w",encoding = "utf-8") as fout:
             fout.write("用户ID,用户昵称,用户头像地址,评论时间,点赞总数,评论内容\n") # headers
         params = self.get_params(1)
-        json_text = self.get_json(self.comments_url,params,self.encSecKey)
+        json_text = self.get_json(comments_url,params,self.encSecKey)
         if isinstance(json_text,bytes):
             json_text = json_text.decode("utf-8") # convert json_text from bytes to str
         json_dict = json.loads(json_text)
@@ -253,7 +255,7 @@ class NetCloudCrawl(object):
                 end_page = (i+1)*pack
             else:
                 end_page = page
-            t = Thread(target = self.save_pages_comments,args = (begin_page,end_page))
+            t = Thread(target = self.save_pages_commentsByLau,args = (comments_url,beginPage,endPage,real))
             threads_list.append(t)
         for i in range(threads):
             threads_list[i].start()
@@ -306,8 +308,59 @@ class NetCloudCrawl(object):
             fout.writelines(comment_info_list)
             print("Write page {begin_page} to {end_page} successfully!".format(begin_page = begin_page,end_page = end_page))
 
+    def save_pages_commentsByLau(self,url,begin_page,end_page,real):
+        '''
+        单独调用某个模块
+        save comments page between begin_page and end_page
+        :param begin_page: the begin page
+        :param end_page: the end page
+        '''
+        comment_info_list = []
+        with open(self.comments_file_path,"a",encoding = "utf-8") as fout:
+            for i in range(begin_page,end_page):
+                params = self.get_params(i+1)
+                json_text = self.get_json(url,params,self.encSecKey)
+                if isinstance(json_text,bytes):
+                    json_text = json_text.decode("utf-8") # convert json_text from bytes to str
+                json_dict = json.loads(json_text)
+                try:
+                    for item in json_dict['comments']:
+                        comment = item['content']
+                        # replace comma to blank,because we want save text as csv format,
+                        # which is seperated by comma,so the commas in the text might cause confusions
+                        comment = comment.replace(","," ")
+                        likedCount = item['likedCount']
+                        comment_time = item['time']
+                        userID = item['user']['userId']
+                        nickname = item['user']['nickname']
+                        nickname = nickname.replace(","," ")
+                        avatarUrl = item['user']['avatarUrl']
 
-
+                        # the comment info string
+                        comment_info = "{userID},{nickname},{avatarUrl},{comment_time},{likedCount},{comment}\n".format(
+                            userID = userID,nickname = nickname,avatarUrl = avatarUrl,comment_time = comment_time,
+                            likedCount = likedCount,comment = comment
+                            )
+                        # 对评论内容进行情感分析 积极、消极情绪绝对值大于0.45
+                        responseText = json.loads(HttpPost.SendHttpPost(comment))
+                        positive_prob = responseText['items'][0]['positive_prob']
+                        negative_prob = responseText['items'][0]['negative_prob']
+                        a = abs(positive_prob - negative_prob)
+                        if (a > real):
+                            comment_info_list.append(comment_info)
+                        else:
+                             continue
+                except KeyError as key_error:
+                    print("Fail to get page {page}.".format(page = i+1))
+                    print("Server parse error:{error}".format(error = key_error))
+                except Exception as e:
+                    print("Fail to get page {page}.".format(page = i+1))
+                    print(e)
+                else:
+                    print("Successfully to save page {page}.".format(page = i+1))
+            fout.writelines(comment_info_list)
+            print("Write page {begin_page} to {end_page} successfully!".format(begin_page = begin_page,end_page = end_page))
+            return comment_info_list
     
     def save_to_file(self,comments_list,filename):
         '''
