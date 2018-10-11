@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # save_all_comments_list_Page=crawler.save_pages_commentsByLau(comments_url,1,10)
     # for comment in save_all_comments_list_Page:
     #     print(comment)
-    crawler.threading_save_all_comments_to_fileByLau(comments_url,1,2,0.45)
+    crawler.threading_save_all_comments_to_fileByLau(comments_url,1,30,0.65)
     # crawler.generate_all_necessary_files(threads=10)
     #analyse = NetCloudAnalyse(song_name,singer_name,song_id,singer_id)
     # analyse.generate_all_analyse_files(threads=20)
