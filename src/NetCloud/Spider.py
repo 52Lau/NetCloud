@@ -4,8 +4,8 @@ from NetCloud.NetCloudAnalyse import NetCloudAnalyse
 
 
 if __name__ == '__main__':
-    song_name = "可不可以"
-    song_id = 553755659
+    song_name = "回首仍是少年"
+    song_id = 1311345294
     singer_name = "张国荣"
     singer_id = 6457
     crawler = NetCloudCrawl(song_name,song_id,singer_name,singer_id)
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # save_all_comments_list_Page=crawler.save_pages_commentsByLau(comments_url,1,10)
     # for comment in save_all_comments_list_Page:
     #     print(comment)
-    crawler.threading_save_all_comments_to_fileByLau(comments_url,1,30,0.65)
+    crawler.threading_save_all_comments_to_fileByLau(comments_url,1,10,0.35)
     # crawler.generate_all_necessary_files(threads=10)
     #analyse = NetCloudAnalyse(song_name,singer_name,song_id,singer_id)
     # analyse.generate_all_analyse_files(threads=20)

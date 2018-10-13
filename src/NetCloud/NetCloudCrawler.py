@@ -27,6 +27,10 @@ import json
 import time
 import os
 import re 
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+
 from threading import Thread
 
 from src.NetCloud import HttpPost
@@ -129,7 +133,7 @@ class NetCloudCrawl(object):
         return response.content
 
     
-    def get_hot_comments(self,url):
+    def get_hot_comments(self,url,real):
         '''
         get the hot comments list
         :param url:the crawl url
@@ -160,7 +164,15 @@ class NetCloudCrawl(object):
                         userID = userID,nickname = nickname,avatarUrl = avatarUrl,comment_time = comment_time,
                         likedCount = likedCount,comment = comment
                         )
-                    hot_comments_list.append(comment_info)
+                    # 对评论内容进行情感分析 积极、消极情绪绝对值大于0.45
+                    responseText = json.loads(self.SendHttpPost(comment))
+                    positive_prob = responseText['items'][0]['positive_prob']
+                    negative_prob = responseText['items'][0]['negative_prob']
+                    a = abs(positive_prob - negative_prob)
+                    if (a > real):
+                        path = self.song_path +'\\'+ avatarUrl.split("/")[-1]
+                        self.PictureSpider(avatarUrl,path)
+                        hot_comments_list.append(comment_info)  
         except KeyError as key_error:
             print("Server parse error:{error}".format(error = key_error))
         except Exception as e:
@@ -169,7 +181,79 @@ class NetCloudCrawl(object):
             print("Get hot comments done!")
         return hot_comments_list
 
-    
+    #发送HTTP POST请求
+    def SendHttpPost(self,text):
+        url = 'https://aip.baidubce.com/rpc/2.0/nlp/v1/sentiment_classify?access_token=24.d2b76c265c2b62ab92e589059e86d830.2592000.1540781521.282335-11600751&charset=UTF-8'
+        body = {"text": text}
+        headers = {'content-type': "application/json"}
+        # print type(body)
+        # print type(json.dumps(body))
+        # 这里有个细节，如果body需要json形式的话，需要做处理
+        # 可以是data = json.dumps(body)
+        response = requests.post(url, data=json.dumps(body), headers=headers)
+        # 也可以直接将data字段换成json字段，2.4.3版本之后支持
+        # response  = requests.post(url, json = body, headers = headers)
+
+        # 返回信息
+        #print(response.text)
+        # 返回响应头
+        #print(response.status_code)
+        return response.text
+
+    def  PictureSpider(self,url,path):
+        '''
+        下载评论者用户头像
+        '''
+        try:
+            if not os.path.exists(path):
+                r = requests.get(url)
+                r.raise_for_status()
+                # 使用with语句可以不用自己手动关闭已经打开的文件流
+                with open(path, "wb") as f:  # 开始写文件，wb代表写二进制文件
+                    f.write(r.content)
+                print("爬取完成")
+            else:
+                print("文件已存在")
+        except Exception as e:
+            print("爬取失败:" + str(e))
+
+    def PictureCut(self,Path,text):
+
+        #需要处理的图片路径 输覆盖原文件
+
+        #设置所使用的字体
+        font = ImageFont.truetype("src/NetCloud/source/simsun.ttc", 18)
+
+        # 加载底图
+        #base_img = Image.open(u'D:\PyCharm\\NetCloud\\src\\NetCloud\songs\张国荣\张国荣.jpg')
+        base_img = Image.open(u'D:\PyCharm\\NetCloud\\src\\NetCloud\songs\张国荣\张国荣.jpg')
+        # 可以查看图片的size和mode，常见mode有RGB和RGBA，RGBA比RGB多了Alpha透明度
+        # print base_img.size, base_img.mode
+        box = (0, 0, 100, 100)  # 底图上需要P掉的区域
+
+        # 加载需要P上去的图片
+        tmp_img = Image.open(u'D:\PyCharm\\NetCloud\src\\NetCloud\songs\张国荣\曾经我也想过一了百了\\109951163451310964.jpg')
+        # 这里可以选择一块区域或者整张图片
+        # region = tmp_img.crop((0,0,304,546)) #选择一块区域
+        # 或者使用整张图片
+        region = tmp_img
+
+        # 使用 paste(region, box) 方法将图片粘贴到另一种图片上去.
+        # 注意，region的大小必须和box的大小完全匹配。但是两张图片的mode可以不同，合并的时候回自动转化。如果需要保留透明度，则使用RGMA mode
+        # 提前将图片进行缩放，以适应box区域大小
+        # region = region.rotate(180) #对图片进行旋转
+        region = region.resize((box[2] - box[0], box[3] - box[1]))
+        base_img.paste(region, box)
+
+        #画图
+        draw = ImageDraw.Draw(base_img)
+        draw.text((120, 50), "@lau52y\n2016-05-05 20:28:54", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
+        draw.text((0, 150), "世界上还有比张国荣+林夕\n，陈奕迅+黄伟文更经典的么？", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
+        draw = ImageDraw.Draw(base_img)
+
+        #base_img.show() # 查看合成的图片
+        base_img.save('./out.png')  # 保存图片
+
     def get_all_comments(self):
         '''
         get a song's all comments in order,note
@@ -265,48 +349,7 @@ class NetCloudCrawl(object):
         print("Using {threads} threads,it costs {cost_time} seconds to crawl <{song_name}>'s all comments!"
                 .format(threads = threads,cost_time = (end_time - start_time),song_name = self.song_name))
 
-    def save_pages_comments(self,begin_page,end_page):
-        '''
-        save comments page between begin_page and end_page
-        :param begin_page: the begin page
-        :param end_page: the end page
-        '''
-        comment_info_list = []
-        with open(self.comments_file_path,"a",encoding = "utf-8") as fout:
-            for i in range(begin_page,end_page):  
-                params = self.get_params(i+1)
-                json_text = self.get_json(self.comments_url,params,self.encSecKey)
-                if isinstance(json_text,bytes):
-                    json_text = json_text.decode("utf-8") # convert json_text from bytes to str
-                json_dict = json.loads(json_text)
-                try:
-                    for item in json_dict['comments']:
-                        comment = item['content'] 
-                        # replace comma to blank,because we want save text as csv format,
-                        # which is seperated by comma,so the commas in the text might cause confusions
-                        comment = comment.replace(","," ")
-                        likedCount = item['likedCount'] 
-                        comment_time = item['time'] 
-                        userID = item['user']['userId'] 
-                        nickname = item['user']['nickname'] 
-                        nickname = nickname.replace(","," ")
-                        avatarUrl = item['user']['avatarUrl'] 
-                        # the comment info string
-                        comment_info = "{userID},{nickname},{avatarUrl},{comment_time},{likedCount},{comment}\n".format(
-                            userID = userID,nickname = nickname,avatarUrl = avatarUrl,comment_time = comment_time,
-                            likedCount = likedCount,comment = comment
-                            )
-                        comment_info_list.append(comment_info)
-                except KeyError as key_error:
-                    print("Fail to get page {page}.".format(page = i+1))
-                    print("Server parse error:{error}".format(error = key_error))
-                except Exception as e:
-                    print("Fail to get page {page}.".format(page = i+1))
-                    print(e)
-                else:
-                    print("Successfully to save page {page}.".format(page = i+1))
-            fout.writelines(comment_info_list)
-            print("Write page {begin_page} to {end_page} successfully!".format(begin_page = begin_page,end_page = end_page))
+
 
     def save_pages_commentsByLau(self,url,begin_page,end_page,real):
         '''
@@ -347,9 +390,9 @@ class NetCloudCrawl(object):
                         negative_prob = responseText['items'][0]['negative_prob']
                         a = abs(positive_prob - negative_prob)
                         if (a > real):
+                            path = self.song_path + '\\' + avatarUrl.split("/")[-1]
+                            self.PictureSpider(avatarUrl, path)
                             comment_info_list.append(comment_info)
-                        else:
-                             continue
                 except KeyError as key_error:
                     print("Fail to get page {page}.".format(page = i+1))
                     print("Server parse error:{error}".format(error = key_error))
@@ -358,6 +401,10 @@ class NetCloudCrawl(object):
                     print(e)
                 else:
                     print("Successfully to save page {page}.".format(page = i+1))
+            #热门评论
+            hot_comments=self.get_hot_comments(url,real)
+            for comment in hot_comments:
+                comment_info_list.append(comment)
             fout.writelines(comment_info_list)
             print("Write page {begin_page} to {end_page} successfully!".format(begin_page = begin_page,end_page = end_page))
             return comment_info_list
@@ -471,18 +518,20 @@ class NetCloudCrawl(object):
 
 
 
-# if __name__ == '__main__':
-#     song_name = '七里香'
-#     song_id = 186001
-#     singer_name = '周杰伦'
-#     singer_id = 6452
-#     netcloud_spider = NetCloudCrawl(song_name = song_name, song_id = song_id,
-#                                     singer_name = singer_name,singer_id = singer_id)
-#     #netcloud_spider._test_netcloudcrawler_all()
-#     #netcloud_spider.generate_all_necessary_files(100)
-#     #netcloud_spider._test_get_lyrics()
-#     netcloud_spider._test_save_lyrics_to_file()
-    
+if __name__ == '__main__':
+    song_name = '七里香'
+    song_id = 186001
+    singer_name = '周杰伦'
+    singer_id = 6452
+    comments_url = "http://music.163.com/weapi/v1/resource/comments/R_SO_4_{song_id}/?csrf_token=".format(
+        song_id=song_id)
+    netcloud_spider = NetCloudCrawl(song_name = song_name, song_id = song_id,
+                                    singer_name = singer_name,singer_id = singer_id)
+    #netcloud_spider._test_netcloudcrawler_all()
+    #netcloud_spider.generate_all_necessary_files(100)
+    #netcloud_spider._test_get_lyrics()
+    netcloud_spider._test_save_lyrics_to_file()
+    netcloud_spider.threading_save_all_comments_to_fileByLau(comments_url, 1, 1, 0.1)
 
 
 

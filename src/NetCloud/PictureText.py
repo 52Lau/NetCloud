@@ -13,7 +13,8 @@ im1 = Image.open(imageFile)
 
 #画图
 draw = ImageDraw.Draw(im1)
-draw.text((0, 0), "世界上还有比张国荣+林夕，陈奕迅+黄伟文更经典的么？", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
+draw.text((0, 0), "世界上还有比张国荣+林夕\n，陈奕迅+黄伟文更经典的么？", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
+draw.text((0, 50), "世界上还有比张国荣+林夕\n，陈奕迅+黄伟文更经典的么？", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
 draw = ImageDraw.Draw(im1)                          #Just draw it!
 
 #另存图片
