@@ -539,8 +539,8 @@ class NetCloudCrawl(object):
 
 
 if __name__ == '__main__':
-    song_name = '听海'
-    song_id = 28314060
+    song_name = 'Rain'
+    song_id = 26418808
     singer_name = '周杰伦'
     singer_id = 6452
     comments_url = "http://music.163.com/weapi/v1/resource/comments/R_SO_4_{song_id}/?csrf_token=".format(
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     #netcloud_spider._test_get_lyrics()
     netcloud_spider._test_save_lyrics_to_file()
     #netcloud_spider.threading_save_all_comments_to_fileByLau(comments_url, 1, 50, 0.45)
-    comment_list=netcloud_spider.save_pages_commentsByLau(comments_url, 1, 50, 0.35)
+    comment_list=netcloud_spider.save_pages_commentsByLau(comments_url, 1, 50, 0.45)
     for comment in comment_list:
         print(comment)
 

@@ -552,7 +552,7 @@ if __name__ == '__main__':
     #netcloud_spider._test_get_lyrics()
     netcloud_spider._test_save_lyrics_to_file()
     #netcloud_spider.threading_save_all_comments_to_fileByLau(comments_url, 1, 50, 0.45)
-    comment_list=netcloud_spider.save_pages_commentsByLau(comments_url, 1, 50, 0.35)
+    comment_list=netcloud_spider.save_pages_commentsByLau(comments_url, 1, 50, 0.45)
     for comment in comment_list:
         print(comment)
 
