@@ -170,9 +170,14 @@ class NetCloudCrawl(object):
                     negative_prob = responseText['items'][0]['negative_prob']
                     a = abs(positive_prob - negative_prob)
                     if (a > real):
-                        path = self.song_path +'\\'+ avatarUrl.split("/")[-1]
-                        self.PictureSpider(avatarUrl,path)
-                        hot_comments_list.append(comment_info)  
+                        path = self.song_path + '\\' + avatarUrl.split("/")[-1]
+                        # 转换成localtime
+                        time_local = time.localtime(comment_time)
+                        # 转换成新的时间格式(2016-05-05 20:28:54)
+                        dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
+                        info = "@" + nickname + "\n\n" + dt + "\n\n在《" + self.song_name + "》下的评论"
+                        self.PictureSpider(avatarUrl, path, info, comment)
+                        hot_comments_list.append(comment_info)
         except KeyError as key_error:
             print("Server parse error:{error}".format(error = key_error))
         except Exception as e:
@@ -200,7 +205,7 @@ class NetCloudCrawl(object):
         #print(response.status_code)
         return response.text
 
-    def  PictureSpider(self,url,path):
+    def  PictureSpider(self,url,path,info,text):
         '''
         下载评论者用户头像
         '''
@@ -211,28 +216,29 @@ class NetCloudCrawl(object):
                 # 使用with语句可以不用自己手动关闭已经打开的文件流
                 with open(path, "wb") as f:  # 开始写文件，wb代表写二进制文件
                     f.write(r.content)
+                #合成图片
+                self.PictureCut(info,path,text)
                 print("爬取完成")
             else:
                 print("文件已存在")
         except Exception as e:
             print("爬取失败:" + str(e))
 
-    def PictureCut(self,Path,text):
+    def PictureCut(self,info,Path,text):
 
         #需要处理的图片路径 输覆盖原文件
 
-        #设置所使用的字体
-        font = ImageFont.truetype("src/NetCloud/source/simsun.ttc", 18)
-
+        # 设置所使用的字体
+        font = ImageFont.truetype("src/NetCloud/source/simsun.ttc", 30)
+        font2 = ImageFont.truetype("src/NetCloud/source/simsun.ttc", 45)
         # 加载底图
-        #base_img = Image.open(u'D:\PyCharm\\NetCloud\\src\\NetCloud\songs\张国荣\张国荣.jpg')
-        base_img = Image.open(u'D:\PyCharm\\NetCloud\\src\\NetCloud\songs\张国荣\张国荣.jpg')
+        base_img = Image.open(u'D:\PyCharm\\NetCloud\\src\\NetCloud\songs\张国荣\\bg.jpg')
         # 可以查看图片的size和mode，常见mode有RGB和RGBA，RGBA比RGB多了Alpha透明度
         # print base_img.size, base_img.mode
-        box = (0, 0, 100, 100)  # 底图上需要P掉的区域
+        box = (20, 320, 270, 590)  # 底图上需要P掉的区域  x轴 y轴 宽（减去x） 高（减去y）
 
         # 加载需要P上去的图片
-        tmp_img = Image.open(u'D:\PyCharm\\NetCloud\src\\NetCloud\songs\张国荣\曾经我也想过一了百了\\109951163451310964.jpg')
+        tmp_img = Image.open(u''+Path)
         # 这里可以选择一块区域或者整张图片
         # region = tmp_img.crop((0,0,304,546)) #选择一块区域
         # 或者使用整张图片
@@ -245,14 +251,23 @@ class NetCloudCrawl(object):
         region = region.resize((box[2] - box[0], box[3] - box[1]))
         base_img.paste(region, box)
 
-        #画图
+        # 画图
         draw = ImageDraw.Draw(base_img)
-        draw.text((120, 50), "@lau52y\n2016-05-05 20:28:54", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
-        draw.text((0, 150), "世界上还有比张国荣+林夕\n，陈奕迅+黄伟文更经典的么？", (255, 0, 0), font=font)    #设置文字位置/内容/颜色/字体
+        # 评论者信息
+        draw.text((300, 400), info, (255, 0, 0),font=font)  # 设置文字位置/内容/颜色/字体
+        # 评论内容
+        #text = '目前唯一支撑我活下去的就是我的父母了，想要让父母过得更好，不想结婚也不想交男朋友，深夜时总会一个人躺在床上胡思乱想，父母已经不年轻了，总有一天会先于我离开，真的到了那一天……我不知道我会不会跟着一起走，只希望，他们可以长命百岁，虽然不太可能，但是我自私的希望他们可以过得比我更久'
+        textPur = ''
+        while text:
+            textPur = textPur + text[:18] + "\n"
+            # print(text[:20])
+            text = text[18:]
+        draw.text((32, 630), textPur, (255, 0, 0), font=font2)  # 设置文字位置/内容/颜色/字体
         draw = ImageDraw.Draw(base_img)
 
-        #base_img.show() # 查看合成的图片
-        base_img.save('./out.png')  # 保存图片
+        #base_img.show()  # 查看合成的图片
+        #base_img.save('./out.png')  # 保存图片
+        base_img.save(Path)  # 保存图片
 
     def get_all_comments(self):
         '''
@@ -310,7 +325,7 @@ class NetCloudCrawl(object):
                 print("Successfully to get page {page}.".format(page = i+1))
         return all_comments_list
 
-    def threading_save_all_comments_to_fileByLau(self,comments_url,beginPage,endPage,real,threads = 10):
+    def threading_save_all_comments_to_fileByLau(self,comments_url,beginPage,endPage,real,threads = 1):
         '''
         use multi threading to get all comments,note that will not
         ensure the crawled comments' order
@@ -391,7 +406,12 @@ class NetCloudCrawl(object):
                         a = abs(positive_prob - negative_prob)
                         if (a > real):
                             path = self.song_path + '\\' + avatarUrl.split("/")[-1]
-                            self.PictureSpider(avatarUrl, path)
+                            # 转换成localtime
+                            time_local = time.localtime(comment_time/1000)
+                            # 转换成新的时间格式(2016-05-05 20:28:54)
+                            dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
+                            info = "@" + nickname + "\n\n" + dt + "\n\n在《" + self.song_name + "》下的评论"
+                            self.PictureSpider(avatarUrl, path, info, comment)
                             comment_info_list.append(comment_info)
                 except KeyError as key_error:
                     print("Fail to get page {page}.".format(page = i+1))
@@ -519,8 +539,8 @@ class NetCloudCrawl(object):
 
 
 if __name__ == '__main__':
-    song_name = '七里香'
-    song_id = 186001
+    song_name = '听海'
+    song_id = 28314060
     singer_name = '周杰伦'
     singer_id = 6452
     comments_url = "http://music.163.com/weapi/v1/resource/comments/R_SO_4_{song_id}/?csrf_token=".format(
@@ -531,7 +551,10 @@ if __name__ == '__main__':
     #netcloud_spider.generate_all_necessary_files(100)
     #netcloud_spider._test_get_lyrics()
     netcloud_spider._test_save_lyrics_to_file()
-    netcloud_spider.threading_save_all_comments_to_fileByLau(comments_url, 1, 1, 0.1)
+    #netcloud_spider.threading_save_all_comments_to_fileByLau(comments_url, 1, 50, 0.45)
+    comment_list=netcloud_spider.save_pages_commentsByLau(comments_url, 1, 50, 0.35)
+    for comment in comment_list:
+        print(comment)
 
 
 
